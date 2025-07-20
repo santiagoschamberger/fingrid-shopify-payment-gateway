@@ -1,0 +1,9 @@
+name = "Bank Account Management"
+type = "customer_account_ui"
+
+[build]
+command = "npm run build"
+path = "dist"
+
+[[extensions.targeting]]
+target = "customer-account.order-status.customer-information.render-after"

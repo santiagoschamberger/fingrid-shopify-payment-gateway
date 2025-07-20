@@ -1,0 +1,10 @@
+# Legacy Netlify config - keeping for reference
+# This project is now configured for Vercel deployment
+
+[build]
+  command = "npm run build"
+  publish = "build/client"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--production=false"

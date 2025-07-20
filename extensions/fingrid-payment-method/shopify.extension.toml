@@ -1,0 +1,25 @@
+name = "Fingrid Payment Method"
+type = "checkout_ui"
+
+[build]
+command = "npm run build"
+path = "dist"
+
+[[extensions.targeting]]
+target = "purchase.checkout.payment-method-list.render-after"
+
+[settings]
+  [[settings.fields]]
+  key = "discount_percentage"
+  type = "number_decimal"
+  name = "Discount Percentage"
+  
+  [[settings.fields]]
+  key = "theme_color"
+  type = "color"
+  name = "Theme Color"
+  
+  [[settings.fields]]
+  key = "show_saved_banks"
+  type = "boolean"
+  name = "Show Saved Bank Accounts"

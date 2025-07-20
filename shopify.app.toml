@@ -1,0 +1,43 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "a5784bc519d756a0638a4a42ab287021"
+name = "usapayments-bank"
+handle = "usapayments-bank"
+application_url = "https://example.com/"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/paid" ]
+  uri = "/webhooks/orders/paid"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/cancelled" ]
+  uri = "/webhooks/orders/cancelled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "customers/data_request" ]
+  uri = "/webhooks/customers/data_request"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,write_orders,read_customers,write_customers,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,read_products,write_script_tags"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[pos]
+embedded = false
