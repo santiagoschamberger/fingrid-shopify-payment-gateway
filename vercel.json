@@ -1,14 +1,5 @@
 {
-  "build": {
-    "env": {
-      "NODE_VERSION": "18"
-    }
-  },
-  "functions": {
-    "app/entry.server.tsx": {
-      "maxDuration": 30
-    }
-  },
+  "buildCommand": "npm run build",
   "headers": [
     {
       "source": "/(.*)",

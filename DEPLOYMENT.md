@@ -23,10 +23,11 @@ Vercel provides excellent hosting for Remix apps with automatic deployments and 
    - Import your Git repository
 
 3. **Configure Build Settings**:
-   - Framework Preset: `Remix`
+   - Framework Preset: `Remix` (auto-detected)
    - Build Command: `npm run build` (auto-detected)
-   - Output Directory: `build` (auto-detected)
+   - Output Directory: Leave empty (Remix handles this)
    - Install Command: `npm install` (auto-detected)
+   - Node.js Version: `18.x` or higher
 
 4. **Set Environment Variables** in Vercel Dashboard:
    ```
@@ -151,19 +152,32 @@ Monitor your app's performance:
 
 ### Common Issues
 
-1. **Webhook Delivery Failures**:
+1. **Vercel Deployment Errors**:
+   - **"functions pattern doesn't match"**: Remove `functions` config from vercel.json (handled by Remix preset)
+   - **Build failures**: Ensure Node.js version is 18.x or higher
+   - **Import errors**: Check that all imports use proper file extensions for server-side code
+
+2. **Webhook Delivery Failures**:
    - Check webhook URLs are accessible
    - Verify HMAC validation
+   - Ensure webhook endpoints return 200 status
 
-2. **Payment Processing Errors**:
-   - Validate Fingrid API credentials
-   - Check network connectivity
-   - Review API rate limits
+3. **Payment Processing Errors**:
+   - Validate Fingrid API credentials in app settings
+   - Check network connectivity to Fingrid APIs
+   - Review API rate limits and error responses
 
-3. **Extension Not Loading**:
-   - Verify extension files are deployed
+4. **Extension Not Loading**:
+   - Verify extension files are deployed with `shopify app deploy`
    - Check browser console for JavaScript errors
-   - Ensure proper extension configuration
+   - Ensure proper extension configuration in TOML files
+
+### Vercel-Specific Notes
+
+- **Remix Integration**: The app uses `@vercel/remix` preset for optimal deployment
+- **Serverless Functions**: Remix routes automatically become serverless functions
+- **Edge Functions**: Not required for this app, standard functions work fine
+- **Build Output**: Vercel handles Remix build output automatically
 
 ### Support
 
