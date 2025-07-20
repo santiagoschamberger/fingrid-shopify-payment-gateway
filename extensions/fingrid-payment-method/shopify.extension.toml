@@ -5,7 +5,7 @@ type = "checkout_ui"
 command = "npm run build"
 path = "dist"
 
-[[extensions.targeting]]
+[[targeting]]
 target = "purchase.checkout.payment-method-list.render-after"
 
 [settings]
