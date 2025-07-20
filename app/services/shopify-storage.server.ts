@@ -1,4 +1,4 @@
-import { shopifyApi } from '~/shopify.server';
+import shopify from '~/shopify.server';
 import { encrypt, decrypt } from '~/utils/encryption.server';
 import type { 
   BankAccount, 
@@ -14,7 +14,7 @@ export class ShopifyStorageService {
   // Customer Bank Management
   async getSavedBanks(customerId: string): Promise<BankAccount[]> {
     try {
-      const response = await shopifyApi.rest.Metafield.all({
+      const response = await shopify.rest.Metafield.all({
         session: this.session,
         owner_id: customerId,
         owner_resource: 'customer',
@@ -49,7 +49,7 @@ export class ShopifyStorageService {
         dateAdded: new Date().toISOString()
       }];
 
-      const metafield = new shopifyApi.rest.Metafield({
+      const metafield = new shopify.rest.Metafield({
         session: this.session,
         namespace: 'fingrid',
         key: 'saved_banks',
@@ -71,7 +71,7 @@ export class ShopifyStorageService {
       const existingBanks = await this.getSavedBanks(customerId);
       const updatedBanks = existingBanks.filter(bank => bank.token !== bankToken);
 
-      const metafield = new shopifyApi.rest.Metafield({
+      const metafield = new shopify.rest.Metafield({
         session: this.session,
         namespace: 'fingrid',
         key: 'saved_banks',
@@ -91,7 +91,7 @@ export class ShopifyStorageService {
   // Transaction Management
   async linkTransactionToOrder(orderId: string, transactionData: TransactionData): Promise<void> {
     try {
-      const metafield = new shopifyApi.rest.Metafield({
+      const metafield = new shopify.rest.Metafield({
         session: this.session,
         namespace: 'fingrid',
         key: 'transaction_data',
@@ -110,7 +110,7 @@ export class ShopifyStorageService {
 
   async getTransactionByOrderId(orderId: string): Promise<TransactionData | null> {
     try {
-      const response = await shopifyApi.rest.Metafield.all({
+      const response = await shopify.rest.Metafield.all({
         session: this.session,
         owner_id: orderId,
         owner_resource: 'order',
@@ -133,7 +133,7 @@ export class ShopifyStorageService {
   // App Settings Management
   async getAppSettings(): Promise<AppSettings> {
     try {
-      const response = await shopifyApi.rest.Metafield.all({
+      const response = await shopify.rest.Metafield.all({
         session: this.session,
         owner_resource: 'shop',
         namespace: 'fingrid_app',
@@ -157,7 +157,7 @@ export class ShopifyStorageService {
     try {
       const encryptedSettings = this.encryptSensitiveFields(settings);
 
-      const metafield = new shopifyApi.rest.Metafield({
+      const metafield = new shopify.rest.Metafield({
         session: this.session,
         namespace: 'fingrid_app',
         key: 'settings',
@@ -186,7 +186,7 @@ export class ShopifyStorageService {
       // Keep only last 1000 webhook events to prevent metafield bloat
       const trimmedEvents = updatedEvents.slice(-1000);
 
-      const metafield = new shopifyApi.rest.Metafield({
+      const metafield = new shopify.rest.Metafield({
         session: this.session,
         namespace: 'fingrid_app',
         key: 'webhook_events',
@@ -204,7 +204,7 @@ export class ShopifyStorageService {
 
   private async getWebhookEvents(): Promise<WebhookEventData[]> {
     try {
-      const response = await shopifyApi.rest.Metafield.all({
+      const response = await shopify.rest.Metafield.all({
         session: this.session,
         owner_resource: 'shop',
         namespace: 'fingrid_app',
