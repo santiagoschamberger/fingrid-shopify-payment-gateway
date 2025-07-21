@@ -6,7 +6,7 @@ import { ShopifyStorageService } from '~/services/shopify-storage.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    const { session } = await authenticate.public.appProxy(request);
+    const { session, admin } = await authenticate.public.appProxy(request);
     
     if (!session) {
       return json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -21,7 +21,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Get app settings
-    const storageService = new ShopifyStorageService(session);
+    const storageService = new ShopifyStorageService(session, admin);
     const settings = await storageService.getAppSettings();
 
     // Exchange public token for bank token

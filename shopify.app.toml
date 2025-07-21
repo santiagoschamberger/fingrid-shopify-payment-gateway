@@ -3,11 +3,12 @@
 client_id = "a5784bc519d756a0638a4a42ab287021"
 name = "usapayments-bank"
 handle = "usapayments-bank"
-application_url = "https://fingrid-shopify-payment-gateway.vercel.app"
+application_url = "https://renewable-maui-juice-exposed.trycloudflare.com"
 embedded = true
 
 [build]
 include_config_on_deploy = true
+automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2025-07"
@@ -37,7 +38,7 @@ api_version = "2025-07"
 scopes = "read_orders,write_orders,read_customers,write_customers,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,read_products,write_script_tags"
 
 [auth]
-redirect_urls = ["https://fingrid-shopify-payment-gateway.vercel.app/auth/callback", "https://fingrid-shopify-payment-gateway.vercel.app/auth/shopify/callback", "https://fingrid-shopify-payment-gateway.vercel.app/api/auth/callback"]
+redirect_urls = ["https://renewable-maui-juice-exposed.trycloudflare.com/auth/callback", "https://renewable-maui-juice-exposed.trycloudflare.com/auth/shopify/callback", "https://renewable-maui-juice-exposed.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

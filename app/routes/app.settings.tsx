@@ -22,10 +22,10 @@ import type { AppSettings } from '~/types/fingrid';
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     console.log('Settings loader: Starting authentication');
-    const { session } = await authenticate.admin(request);
+    const { session, admin } = await authenticate.admin(request);
     console.log('Settings loader: Authentication successful');
     
-    const storageService = new ShopifyStorageService(session);
+    const storageService = new ShopifyStorageService(session, admin);
     console.log('Settings loader: Created storage service');
     
     const settings = await storageService.getAppSettings();
@@ -42,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   
   try {
     const formData = await request.formData();
@@ -79,7 +79,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const validatedSettings = validateInput(schemas.settingsUpdate, settings);
 
     // Save settings
-    const storageService = new ShopifyStorageService(session);
+    const storageService = new ShopifyStorageService(session, admin);
     await storageService.updateAppSettings(validatedSettings);
 
     return json({ success: true, message: 'Settings saved successfully' });
@@ -87,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.error('Error saving settings:', error);
     return json({ 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to save settings' 
+      error: error instanceof Error ? error.message : 'Failed to update app settings' 
     }, { status: 400 });
   }
 };

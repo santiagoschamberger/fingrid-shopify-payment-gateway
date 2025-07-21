@@ -19,10 +19,10 @@ import { authenticate } from "../shopify.server";
 import { ShopifyStorageService } from "../services/shopify-storage.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   
   // Get app settings to check if configured
-  const storageService = new ShopifyStorageService(session);
+  const storageService = new ShopifyStorageService(session, admin);
   const settings = await storageService.getAppSettings();
   
   return { 

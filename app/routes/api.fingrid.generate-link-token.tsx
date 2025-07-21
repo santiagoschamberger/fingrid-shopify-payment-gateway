@@ -7,7 +7,7 @@ import { validateInput, schemas } from '~/utils/validation.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    const { session } = await authenticate.public.appProxy(request);
+    const { session, admin } = await authenticate.public.appProxy(request);
     
     if (!session) {
       return json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -25,7 +25,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const validatedData = validateInput(schemas.linkTokenRequest, data);
 
     // Get app settings
-    const storageService = new ShopifyStorageService(session);
+    const storageService = new ShopifyStorageService(session, admin);
     const settings = await storageService.getAppSettings();
 
     // Generate link token

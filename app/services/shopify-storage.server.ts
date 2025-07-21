@@ -1,4 +1,3 @@
-import shopify from '~/shopify.server';
 import { encrypt, decrypt } from '~/utils/encryption.server';
 import type { 
   BankAccount, 
@@ -6,10 +5,9 @@ import type {
   TransactionData, 
   WebhookEventData 
 } from '~/types/fingrid';
-import type { Session } from '@shopify/shopify-app-remix';
 
 export class ShopifyStorageService {
-  constructor(private session: Session) {}
+  constructor(private session: any, private admin: any) {}
 
   // GraphQL queries and mutations
   private metafieldSetMutation = `#graphql
@@ -104,8 +102,7 @@ export class ShopifyStorageService {
   async getSavedBanks(customerId: string): Promise<BankAccount[]> {
     try {
       const gid = `gid://shopify/Customer/${customerId}`;
-      const response = await shopify.graphql(this.metafieldQuery, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldQuery, {
         variables: { owner: gid }
       });
 
@@ -144,8 +141,7 @@ export class ShopifyStorageService {
       }];
 
       const gid = `gid://shopify/Customer/${customerId}`;
-      const response = await shopify.graphql(this.metafieldSetMutation, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
         variables: {
           metafields: [{
             namespace: 'fingrid',
@@ -175,8 +171,7 @@ export class ShopifyStorageService {
       const updatedBanks = existingBanks.filter(bank => bank.token !== bankToken);
 
       const gid = `gid://shopify/Customer/${customerId}`;
-      const response = await shopify.graphql(this.metafieldSetMutation, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
         variables: {
           metafields: [{
             namespace: 'fingrid',
@@ -204,8 +199,7 @@ export class ShopifyStorageService {
   async linkTransactionToOrder(orderId: string, transactionData: TransactionData): Promise<void> {
     try {
       const gid = `gid://shopify/Order/${orderId}`;
-      const response = await shopify.graphql(this.metafieldSetMutation, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
         variables: {
           metafields: [{
             namespace: 'fingrid',
@@ -232,8 +226,7 @@ export class ShopifyStorageService {
   async getTransactionByOrderId(orderId: string): Promise<TransactionData | null> {
     try {
       const gid = `gid://shopify/Order/${orderId}`;
-      const response = await shopify.graphql(this.metafieldQuery, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldQuery, {
         variables: { owner: gid }
       });
 
@@ -259,9 +252,7 @@ export class ShopifyStorageService {
   // App Settings Management
   async getAppSettings(): Promise<AppSettings> {
     try {
-      const response = await shopify.graphql(this.shopMetafieldsQuery, {
-        session: this.session,
-      });
+      const response = await this.admin.graphql(this.shopMetafieldsQuery);
 
       const data = await response.json();
       
@@ -288,21 +279,18 @@ export class ShopifyStorageService {
       const encryptedSettings = this.encryptSensitiveFields(settings);
 
       // Get shop GID first
-      const shopResponse = await shopify.graphql(`#graphql
+      const shopResponse = await this.admin.graphql(`#graphql
         query getShop {
           shop {
             id
           }
         }
-      `, {
-        session: this.session,
-      });
+      `);
 
       const shopData = await shopResponse.json();
       const shopGid = shopData.data.shop.id;
 
-      const response = await shopify.graphql(this.metafieldSetMutation, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
         variables: {
           metafields: [{
             namespace: 'fingrid_app',
@@ -340,21 +328,18 @@ export class ShopifyStorageService {
       const trimmedEvents = updatedEvents.slice(-1000);
 
       // Get shop GID first
-      const shopResponse = await shopify.graphql(`#graphql
+      const shopResponse = await this.admin.graphql(`#graphql
         query getShop {
           shop {
             id
           }
         }
-      `, {
-        session: this.session,
-      });
+      `);
 
       const shopData = await shopResponse.json();
       const shopGid = shopData.data.shop.id;
 
-      const response = await shopify.graphql(this.metafieldSetMutation, {
-        session: this.session,
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
         variables: {
           metafields: [{
             namespace: 'fingrid_app',
@@ -380,9 +365,7 @@ export class ShopifyStorageService {
 
   private async getWebhookEvents(): Promise<WebhookEventData[]> {
     try {
-      const response = await shopify.graphql(this.shopMetafieldsQuery, {
-        session: this.session,
-      });
+      const response = await this.admin.graphql(this.shopMetafieldsQuery);
 
       const data = await response.json();
       
@@ -440,8 +423,8 @@ export class ShopifyStorageService {
       
       // Pre-populate with environment variables if available
       testGatewayUrl: process.env.FINGRID_TEST_GATEWAY_URL || 'https://api.test.fingrid.com',
-      testClientId: process.env.FINGRID_TEST_CLIENT_ID || '',
-      testClientSecret: process.env.FINGRID_TEST_CLIENT_SECRET || '',
+      testClientId: process.env.FINGRID_TEST_CLIENT_ID || 'AUrByDqHwcgK29YV7BkhrnzB2Jy8Vg',
+      testClientSecret: process.env.FINGRID_TEST_CLIENT_SECRET || 'ViWpgUNQEJdCuRBXnXMe9V0MNzUcxb',
       testScriptUrl: process.env.FINGRID_TEST_SCRIPT_URL || 'https://js.test.fingrid.com/cabbage.js',
       
       liveGatewayUrl: process.env.FINGRID_LIVE_GATEWAY_URL || 'https://api.fingrid.com',

@@ -5,14 +5,14 @@ import { ShopifyStorageService } from '~/services/shopify-storage.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    const { topic, shop, session, payload } = await authenticate.webhook(request);
+    const { topic, shop, session, payload, admin } = await authenticate.webhook(request);
 
     if (!session) {
       console.error('No session found for webhook');
       return new Response('OK', { status: 200 });
     }
 
-    const storageService = new ShopifyStorageService(session);
+    const storageService = new ShopifyStorageService(session, admin);
     
     // Log the webhook event
     await storageService.logWebhookEvent({
