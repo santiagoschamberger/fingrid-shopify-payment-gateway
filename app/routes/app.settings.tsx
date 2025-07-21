@@ -20,12 +20,25 @@ import { validateInput, schemas } from '~/utils/validation.server';
 import type { AppSettings } from '~/types/fingrid';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  
-  const storageService = new ShopifyStorageService(session);
-  const settings = await storageService.getAppSettings();
+  try {
+    console.log('Settings loader: Starting authentication');
+    const { session } = await authenticate.admin(request);
+    console.log('Settings loader: Authentication successful');
+    
+    const storageService = new ShopifyStorageService(session);
+    console.log('Settings loader: Created storage service');
+    
+    const settings = await storageService.getAppSettings();
+    console.log('Settings loader: Retrieved settings', { settings });
 
-  return json({ settings });
+    return json({ settings });
+  } catch (error) {
+    console.error('Settings loader error:', error);
+    throw new Response('Settings loading failed', { 
+      status: 500,
+      statusText: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
