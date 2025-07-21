@@ -21,12 +21,15 @@ export const schemas = {
     clientName: z.string().optional(),
     discountPercentage: z.number().min(0).max(100),
     themeColor: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
+    themeLogo: z.string().optional(),
     testGatewayUrl: z.string().url().optional(),
     testClientId: z.string().optional(),
     testClientSecret: z.string().optional(),
+    testConnectedAccount: z.string().optional(),
     liveGatewayUrl: z.string().url().optional(),
     liveClientId: z.string().optional(),
     liveClientSecret: z.string().optional(),
+    liveConnectedAccount: z.string().optional(),
     postTransactionStatus: z.string(),
     webhookSuccessStatus: z.string(),
     webhookFailedStatus: z.string()
@@ -46,7 +49,7 @@ export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): T {
     return schema.parse(data);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new Error(`Validation failed: ${error.errors.map(e => e.message).join(', ')}`);
+      throw new Error(`Validation failed: ${error.issues.map((e: any) => e.message).join(', ')}`);
     }
     throw error;
   }

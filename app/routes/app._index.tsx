@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useLoaderData, Link } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -10,16 +10,25 @@ import {
   BlockStack,
   Box,
   List,
-  Link,
   InlineStack,
+  Banner,
+  Icon,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { ShopifyStorageService } from "../services/shopify-storage.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-
-  return null;
+  const { session } = await authenticate.admin(request);
+  
+  // Get app settings to check if configured
+  const storageService = new ShopifyStorageService(session);
+  const settings = await storageService.getAppSettings();
+  
+  return { 
+    settings,
+    isConfigured: Boolean(settings.testClientId || settings.liveClientId)
+  };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -92,6 +101,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Index() {
+  const { settings, isConfigured } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
 
   const shopify = useAppBridge();
@@ -108,219 +118,158 @@ export default function Index() {
       shopify.toast.show("Product created");
     }
   }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
 
   return (
     <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
-        </button>
+      <TitleBar title="Fingrid Payment Gateway">
+        <Link to="/app/settings">
+          <Button variant="primary">
+            Settings
+          </Button>
+        </Link>
       </TitleBar>
       <BlockStack gap="500">
         <Layout>
           <Layout.Section>
+            {!isConfigured && (
+              <Banner
+                title="Setup Required"
+                tone="warning"
+                action={{
+                  content: "Configure Settings",
+                  url: "/app/settings"
+                }}
+              >
+                Configure your Fingrid API credentials to start accepting bank transfer payments.
+              </Banner>
+            )}
+            
             <Card>
               <BlockStack gap="500">
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
+                    Welcome to Fingrid Payment Gateway 🏦
                   </Text>
                   <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
+                    Your secure bank transfer payment solution is ready to go. This app integrates{" "}
+                    <strong>Fingrid's payment API</strong> with Shopify to offer customers a seamless 
+                    bank transfer payment option with optional discounts.
                   </Text>
                 </BlockStack>
+                
                 <BlockStack gap="200">
                   <Text as="h3" variant="headingMd">
-                    Get started with products
+                    Current Configuration
                   </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
+                  <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                    <BlockStack gap="200">
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Mode:</Text>
+                        <Text as="span" variant="bodyMd">
+                          {settings.testMode ? "Test Mode" : "Live Mode"}
+                        </Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Client Name:</Text>
+                        <Text as="span" variant="bodyMd">{settings.clientName || "Not configured"}</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">Discount:</Text>
+                        <Text as="span" variant="bodyMd">{settings.discountPercentage}%</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="span" variant="bodyMd">API Status:</Text>
+                        <Text as="span" variant="bodyMd">
+                          {isConfigured ? "Configured" : "Needs Setup"}
+                        </Text>
+                      </InlineStack>
+                    </BlockStack>
+                  </Box>
                 </BlockStack>
+
                 <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
+                  <Link to="/app/settings">
+                    <Button>
+                      Configure Settings
                     </Button>
+                  </Link>
+                  {isConfigured && (
+                    <Link to="/app/additional">
+                      <Button variant="plain">
+                        View Transactions
+                      </Button>
+                    </Link>
                   )}
                 </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
               </BlockStack>
             </Card>
           </Layout.Section>
+          
           <Layout.Section variant="oneThird">
             <BlockStack gap="500">
               <Card>
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
-                    App template specs
+                    Payment Features
                   </Text>
                   <BlockStack gap="200">
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">
-                        Framework
+                        Payment Method
                       </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
+                      <Text as="span" variant="bodyMd">
+                        Bank Transfers
+                      </Text>
                     </InlineStack>
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">
-                        Database
+                        Processing
                       </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
+                      <Text as="span" variant="bodyMd">
+                        Real-time
+                      </Text>
                     </InlineStack>
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">
-                        Interface
+                        Security
                       </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
+                      <Text as="span" variant="bodyMd">
+                        Bank-grade
+                      </Text>
                     </InlineStack>
                     <InlineStack align="space-between">
                       <Text as="span" variant="bodyMd">
-                        API
+                        Storage
                       </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
+                      <Text as="span" variant="bodyMd">
+                        Shopify Metafields
+                      </Text>
                     </InlineStack>
                   </BlockStack>
                 </BlockStack>
               </Card>
+              
               <Card>
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
-                    Next steps
+                    Quick Actions
                   </Text>
                   <List>
                     <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
+                      <Link to="/app/settings">
+                        Configure API credentials
+                      </Link>
                     </List.Item>
                     <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
+                      <Link to="/app/additional">
+                        View transaction reports
                       </Link>
+                    </List.Item>
+                    <List.Item>
+                      Test payment flow in your store
+                    </List.Item>
+                    <List.Item>
+                      Review webhook configurations
                     </List.Item>
                   </List>
                 </BlockStack>
