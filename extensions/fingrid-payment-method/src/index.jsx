@@ -4,35 +4,33 @@ import {
   useBuyerJourney,
   useCartLines,
   useApi,
-  usePurchasingCompany,
   useCustomer,
   Text,
   BlockStack,
   InlineStack,
   Button,
-  Checkbox,
   Banner,
   SkeletonText,
-  Image,
+  Spinner,
 } from '@shopify/ui-extensions-react/checkout';
 import { useState, useEffect } from 'react';
 
+// Target renders after payment methods to enhance manual bank transfer
 export default reactExtension('purchase.checkout.payment-method-list.render-after', () => (
-  <FingridPaymentMethod />
+  <FingridPaymentEnhancement />
 ));
 
-function FingridPaymentMethod() {
+function FingridPaymentEnhancement() {
   const settings = useSettings();
   const { intercept } = useBuyerJourney();
   const cartLines = useCartLines();
-  const { extension, query, sessionToken } = useApi();
+  const { sessionToken } = useApi();
   const customer = useCustomer();
   
-  const [isSelected, setIsSelected] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, processing, success, error
   const [errorMessage, setErrorMessage] = useState('');
-  const [linkToken, setLinkToken] = useState(null);
   const [fingridLoaded, setFingridLoaded] = useState(false);
 
   // Calculate total amount
@@ -45,18 +43,18 @@ function FingridPaymentMethod() {
   const discountAmount = totalAmount * (discountPercentage / 100);
   const finalAmount = totalAmount - discountAmount;
 
-  // Load Fingrid SDK when payment method is selected
+  // Load Fingrid SDK when component is active
   useEffect(() => {
-    if (isSelected && !fingridLoaded) {
+    if (isActive && !fingridLoaded) {
       loadFingridSDK();
     }
-  }, [isSelected]);
+  }, [isActive]);
 
   const loadFingridSDK = async () => {
     try {
       // Use correct Fingrid JavaScript SDK URLs from documentation
       const script = document.createElement('script');
-      script.src = settings.testMode 
+      script.src = settings.test_mode 
         ? 'https://cabbagepay.com/js/sandbox/cabbage.js'
         : 'https://cabbagepay.com/js/production/cabbage.js';
       
@@ -78,35 +76,6 @@ function FingridPaymentMethod() {
       setPaymentStatus('error');
     }
   };
-
-  // Intercept checkout submission when Fingrid payment is selected
-  useEffect(() => {
-    return intercept('purchase.checkout.payment-method.submit', async (result) => {
-      if (!isSelected) {
-        return result;
-      }
-
-      setIsProcessing(true);
-      setPaymentStatus('processing');
-      
-      try {
-        await processPayment();
-        setPaymentStatus('success');
-        return result;
-      } catch (error) {
-        setPaymentStatus('error');
-        setErrorMessage(error.message || 'Payment processing failed. Please try again.');
-        
-        return {
-          ...result,
-          behavior: 'block',
-          reason: 'Payment processing failed. Please try again or choose a different payment method.',
-        };
-      } finally {
-        setIsProcessing(false);
-      }
-    });
-  }, [isSelected, fingridLoaded]);
 
   const handleFingridMessage = (event) => {
     try {
@@ -144,6 +113,12 @@ function FingridPaymentMethod() {
       setErrorMessage('Payment interface error. Please try again.');
       setIsProcessing(false);
     }
+  };
+
+  const activateFinGridPayment = () => {
+    setIsActive(true);
+    setPaymentStatus('idle');
+    setErrorMessage('');
   };
 
   const processPayment = async () => {
@@ -277,34 +252,40 @@ function FingridPaymentMethod() {
     }
   };
 
-  const handleTogglePayment = (checked) => {
-    setIsSelected(checked);
-    setPaymentStatus('idle');
-    setErrorMessage('');
+  const handleProcessPayment = async () => {
+    setIsProcessing(true);
+    setPaymentStatus('processing');
+    
+    try {
+      await processPayment();
+      setPaymentStatus('success');
+    } catch (error) {
+      setPaymentStatus('error');
+      setErrorMessage(error.message || 'Payment processing failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <BlockStack spacing="base">
-      <Checkbox
-        checked={isSelected}
-        onChange={handleTogglePayment}
-      >
-        <InlineStack spacing="tight" blockAlignment="center">
-          <Text emphasis="strong">
-            Pay by Bank Transfer
-          </Text>
-          {discountPercentage > 0 && (
-            <Text appearance="accent" emphasis="strong">
-              Save {discountPercentage}%
-            </Text>
-          )}
-        </InlineStack>
-      </Checkbox>
+      <Banner status="info">
+        <Text emphasis="strong">🏦 Enhanced Bank Transfer Available</Text>
+        <Text size="small">
+          If you selected "Bank Transfer" as your payment method above, use the button below to pay securely with FinGrid.
+        </Text>
+      </Banner>
 
-      {isSelected && (
+      {!isActive ? (
+        <Button onPress={activateFinGridPayment} disabled={isProcessing}>
+          Activate Enhanced Bank Transfer
+        </Button>
+      ) : (
         <BlockStack spacing="base">
+          <Text emphasis="strong">FinGrid Bank Transfer Payment</Text>
+          
           <Text size="small" appearance="subdued">
-            🏦 Secure bank transfer powered by FinGrid. Connect your bank account and pay directly.
+            Secure bank transfer powered by FinGrid. Connect your bank account and pay directly.
           </Text>
 
           {discountPercentage > 0 && (
@@ -325,16 +306,14 @@ function FingridPaymentMethod() {
           )}
 
           {fingridLoaded && paymentStatus === 'idle' && (
-            <Banner status="info">
-              <Text size="small">
-                ✓ Payment interface ready. Click "Complete order" to select your bank and authorize payment.
-              </Text>
-            </Banner>
+            <Button onPress={handleProcessPayment} disabled={isProcessing}>
+              Pay with Bank Transfer - ${finalAmount.toFixed(2)}
+            </Button>
           )}
 
           {paymentStatus === 'processing' && (
-            <BlockStack spacing="tight">
-              <SkeletonText inlineSize="large" />
+            <BlockStack spacing="tight" blockAlignment="center">
+              <Spinner size="small" />
               <Text size="small" appearance="subdued">
                 🏦 Opening bank selection interface...
               </Text>
@@ -353,27 +332,21 @@ function FingridPaymentMethod() {
             <Banner status="success">
               <Text size="small">
                 ✅ Payment authorized successfully! Your bank transfer is being processed.
+                You can now complete your order above.
               </Text>
             </Banner>
           )}
 
-          {/* Final Amount Display */}
-          <InlineStack spacing="base" blockAlignment="center">
-            <Text size="small" appearance="subdued">
-              Total amount:
-            </Text>
-            <Text size="small" emphasis="bold">
-              ${finalAmount.toFixed(2)}
-            </Text>
-            {discountPercentage > 0 && (
+          {discountPercentage > 0 && (
+            <InlineStack spacing="base" blockAlignment="center">
               <Text size="small" appearance="subdued">
-                (${discountAmount.toFixed(2)} saved)
+                You save: ${discountAmount.toFixed(2)} ({discountPercentage}% discount)
               </Text>
-            )}
-          </InlineStack>
+            </InlineStack>
+          )}
 
           <Text size="small" appearance="subdued">
-            When you complete your order, FinGrid's secure popup will open for bank selection and payment authorization. The process is secure and your bank credentials are never shared.
+            FinGrid's secure popup will open for bank selection and payment authorization. Your bank credentials are never shared.
           </Text>
         </BlockStack>
       )}
