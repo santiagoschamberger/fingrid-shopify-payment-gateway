@@ -32,9 +32,8 @@ function FingridPaymentMethod() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); // idle, processing, success, error
   const [errorMessage, setErrorMessage] = useState('');
-  const [savedBanks, setSavedBanks] = useState([]);
-  const [selectedBankId, setSelectedBankId] = useState(null);
-  const [showBankSelection, setShowBankSelection] = useState(false);
+  const [linkToken, setLinkToken] = useState(null);
+  const [fingridLoaded, setFingridLoaded] = useState(false);
 
   // Calculate total amount
   const totalAmount = cartLines.reduce((total, line) => {
@@ -46,29 +45,30 @@ function FingridPaymentMethod() {
   const discountAmount = totalAmount * (discountPercentage / 100);
   const finalAmount = totalAmount - discountAmount;
 
-  // Load saved bank accounts when payment method is selected
+  // Load Fingrid SDK when payment method is selected
   useEffect(() => {
-    if (isSelected && customer?.id && settings.show_saved_banks) {
-      loadSavedBanks();
+    if (isSelected && !fingridLoaded) {
+      loadFingridSDK();
     }
-  }, [isSelected, customer?.id]);
+  }, [isSelected]);
 
-  const loadSavedBanks = async () => {
+  const loadFingridSDK = async () => {
     try {
-      const response = await fetch(`/api/fingrid/saved-banks?customer_id=${customer.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${sessionToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSavedBanks(data.banks || []);
-      }
+      // Load Fingrid's JavaScript SDK dynamically
+      const script = document.createElement('script');
+      script.src = settings.testMode 
+        ? 'https://js.test.fingrid.com/cabbage.js'
+        : 'https://js.fingrid.com/cabbage.js';
+      script.onload = () => setFingridLoaded(true);
+      script.onerror = () => {
+        setErrorMessage('Failed to load payment interface');
+        setPaymentStatus('error');
+      };
+      document.head.appendChild(script);
     } catch (error) {
-      console.error('Failed to load saved banks:', error);
+      console.error('Failed to load Fingrid SDK:', error);
+      setErrorMessage('Payment service unavailable');
+      setPaymentStatus('error');
     }
   };
 
@@ -99,18 +99,83 @@ function FingridPaymentMethod() {
         setIsProcessing(false);
       }
     });
-  }, [isSelected, selectedBankId]);
+  }, [isSelected, fingridLoaded]);
 
   const processPayment = async () => {
-    if (!selectedBankId && savedBanks.length > 0) {
-      throw new Error('Please select a bank account');
-    }
+    return new Promise((resolve, reject) => {
+      try {
+        // Generate link token first
+        generateLinkTokenForPayment()
+          .then((token) => {
+            if (!window.Fingrid) {
+              throw new Error('Fingrid SDK not loaded');
+            }
 
-    const paymentData = {
+            // Initialize Fingrid with the link token
+            window.Fingrid.create({
+              link_token: token,
+              onSuccess: (public_token, metadata) => {
+                // Exchange public token for bank account access
+                exchangePublicToken(public_token, metadata)
+                  .then(() => {
+                    setPaymentStatus('success');
+                    resolve();
+                  })
+                  .catch(reject);
+              },
+              onLoad: () => {
+                console.log('Fingrid interface loaded');
+              },
+              onExit: (err, metadata) => {
+                if (err) {
+                  console.error('Fingrid flow exited with error:', err);
+                  reject(new Error(err.display_message || 'Payment cancelled'));
+                } else {
+                  reject(new Error('Payment cancelled by user'));
+                }
+              },
+            }).open();
+          })
+          .catch(reject);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  const generateLinkTokenForPayment = async () => {
+    const linkData = {
+      customer_id: customer?.id,
+      customer_email: customer?.email,
+      return_url: window.location.href,
       amount: finalAmount,
       currency: 'USD',
+    };
+
+    const response = await fetch('/api/fingrid/generate-link-token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(linkData),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate payment token');
+    }
+
+    const { link_token } = await response.json();
+    return link_token;
+  };
+
+  const exchangePublicToken = async (public_token, metadata) => {
+    const exchangeData = {
+      public_token,
+      account_id: metadata.account_id,
       customer_id: customer?.id,
-      bank_token: selectedBankId,
+      amount: finalAmount,
+      currency: 'USD',
       line_items: cartLines.map(line => ({
         id: line.id,
         title: line.merchandise.title,
@@ -119,13 +184,13 @@ function FingridPaymentMethod() {
       })),
     };
 
-    const response = await fetch('/api/fingrid/process-payment', {
+    const response = await fetch('/api/fingrid/exchange-token', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${sessionToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(paymentData),
+      body: JSON.stringify(exchangeData),
     });
 
     if (!response.ok) {
@@ -133,44 +198,7 @@ function FingridPaymentMethod() {
       throw new Error(error.message || 'Payment processing failed');
     }
 
-    const result = await response.json();
-    return result;
-  };
-
-  const startBankLinking = async () => {
-    try {
-      setIsProcessing(true);
-      
-      const linkData = {
-        customer_id: customer?.id,
-        customer_email: customer?.email,
-        return_url: window.location.origin + '/checkout',
-      };
-
-      const response = await fetch('/api/fingrid/generate-link-token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${sessionToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(linkData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to start bank linking');
-      }
-
-      const { link_token, expiry } = await response.json();
-      
-      // Open Fingrid's bank linking interface
-      window.open(`https://link.fingrid.com/link?token=${link_token}`, '_blank');
-      
-    } catch (error) {
-      setErrorMessage(error.message || 'Failed to start bank linking');
-      setPaymentStatus('error');
-    } finally {
-      setIsProcessing(false);
-    }
+    return response.json();
   };
 
   const handleTogglePayment = (checked) => {
@@ -200,7 +228,7 @@ function FingridPaymentMethod() {
       {isSelected && (
         <BlockStack spacing="base">
           <Text size="small" appearance="subdued">
-            Pay securely with your bank account. No fees, instant verification.
+            🏦 Secure bank transfer powered by Fingrid. Select your bank and pay directly from your account.
           </Text>
 
           {discountPercentage > 0 && (
@@ -211,41 +239,26 @@ function FingridPaymentMethod() {
             </Banner>
           )}
 
-          {/* Bank Selection UI */}
-          {savedBanks.length > 0 && (
+          {!fingridLoaded && (
             <BlockStack spacing="tight">
-              <Text size="small" emphasis="bold">Select Bank Account:</Text>
-              {savedBanks.map((bank) => (
-                <InlineStack key={bank.token} spacing="tight" blockAlignment="center">
-                  <Checkbox
-                    checked={selectedBankId === bank.token}
-                    onChange={() => setSelectedBankId(bank.token)}
-                  />
-                  <Text size="small">
-                    {bank.bankName} •••• {bank.last4}
-                  </Text>
-                </InlineStack>
-              ))}
+              <SkeletonText inlineSize="large" />
+              <Text size="small" appearance="subdued">
+                Loading secure payment interface...
+              </Text>
             </BlockStack>
           )}
 
-          {/* Add New Bank Button */}
-          {customer?.id && (
-            <Button
-              kind="secondary"
-              onPress={startBankLinking}
-              disabled={isProcessing}
-            >
-              {savedBanks.length > 0 ? 'Add New Bank Account' : 'Connect Bank Account'}
-            </Button>
+          {fingridLoaded && paymentStatus === 'idle' && (
+            <Text size="small" appearance="accent" emphasis="bold">
+              ✓ Payment interface ready. Click "Complete order" to select your bank.
+            </Text>
           )}
 
-          {/* Payment Status Messages */}
           {paymentStatus === 'processing' && (
             <BlockStack spacing="tight">
               <SkeletonText inlineSize="large" />
               <Text size="small" appearance="subdued">
-                🏦 Processing your bank transfer payment...
+                🏦 Opening Fingrid bank selection...
               </Text>
             </BlockStack>
           )}
@@ -261,7 +274,7 @@ function FingridPaymentMethod() {
           {paymentStatus === 'success' && (
             <Banner status="success">
               <Text size="small">
-                ✅ Bank transfer payment processed successfully!
+                ✅ Payment processed successfully! Your bank transfer is complete.
               </Text>
             </Banner>
           )}
@@ -280,6 +293,10 @@ function FingridPaymentMethod() {
               </Text>
             )}
           </InlineStack>
+
+          <Text size="small" appearance="subdued">
+            When you complete your order, Fingrid's secure popup will open for bank selection and payment authorization.
+          </Text>
         </BlockStack>
       )}
     </BlockStack>
