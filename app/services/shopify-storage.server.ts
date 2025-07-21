@@ -11,20 +11,114 @@ import type { Session } from '@shopify/shopify-app-remix';
 export class ShopifyStorageService {
   constructor(private session: Session) {}
 
+  // GraphQL queries and mutations
+  private metafieldSetMutation = `#graphql
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields {
+          id
+          namespace
+          key
+          value
+          type
+          owner {
+            ... on Customer { id }
+            ... on Order { id }
+            ... on Shop { id }
+          }
+        }
+        userErrors {
+          field
+          message
+          code
+        }
+      }
+    }
+  `;
+
+  private metafieldQuery = `#graphql
+    query getMetafields($owner: ID!) {
+      node(id: $owner) {
+        ... on Customer {
+          metafields(first: 50) {
+            edges {
+              node {
+                id
+                namespace
+                key
+                value
+                type
+              }
+            }
+          }
+        }
+        ... on Order {
+          metafields(first: 50) {
+            edges {
+              node {
+                id
+                namespace
+                key
+                value
+                type
+              }
+            }
+          }
+        }
+        ... on Shop {
+          metafields(first: 50) {
+            edges {
+              node {
+                id
+                namespace
+                key
+                value
+                type
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  private shopMetafieldsQuery = `#graphql
+    query getShopMetafields {
+      shop {
+        metafields(namespace: "fingrid_app", first: 10) {
+          edges {
+            node {
+              id
+              namespace
+              key
+              value
+              type
+            }
+          }
+        }
+      }
+    }
+  `;
+
   // Customer Bank Management
   async getSavedBanks(customerId: string): Promise<BankAccount[]> {
     try {
-      const response = await shopify.rest.Metafield.all({
+      const gid = `gid://shopify/Customer/${customerId}`;
+      const response = await shopify.graphql(this.metafieldQuery, {
         session: this.session,
-        owner_id: customerId,
-        owner_resource: 'customer',
-        namespace: 'fingrid',
-        key: 'saved_banks'
+        variables: { owner: gid }
       });
 
-      if (response.data && response.data.length > 0) {
-        const metafield = response.data[0];
-        return JSON.parse(metafield.value as string);
+      const data = await response.json();
+      
+      if (data.data?.node?.metafields?.edges) {
+        const metafield = data.data.node.metafields.edges.find(
+          (edge: any) => edge.node.namespace === 'fingrid' && edge.node.key === 'saved_banks'
+        );
+        
+        if (metafield) {
+          return JSON.parse(metafield.node.value);
+        }
       }
 
       return [];
@@ -49,17 +143,26 @@ export class ShopifyStorageService {
         dateAdded: new Date().toISOString()
       }];
 
-      const metafield = new shopify.rest.Metafield({
+      const gid = `gid://shopify/Customer/${customerId}`;
+      const response = await shopify.graphql(this.metafieldSetMutation, {
         session: this.session,
-        namespace: 'fingrid',
-        key: 'saved_banks',
-        value: JSON.stringify(updatedBanks),
-        type: 'json',
-        owner_id: customerId,
-        owner_resource: 'customer'
+        variables: {
+          metafields: [{
+            namespace: 'fingrid',
+            key: 'saved_banks',
+            value: JSON.stringify(updatedBanks),
+            type: 'json',
+            ownerId: gid
+          }]
+        }
       });
 
-      await metafield.save();
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to save metafield');
+      }
     } catch (error) {
       console.error('Error adding bank account:', error);
       throw new Error('Failed to save bank account');
@@ -71,17 +174,26 @@ export class ShopifyStorageService {
       const existingBanks = await this.getSavedBanks(customerId);
       const updatedBanks = existingBanks.filter(bank => bank.token !== bankToken);
 
-      const metafield = new shopify.rest.Metafield({
+      const gid = `gid://shopify/Customer/${customerId}`;
+      const response = await shopify.graphql(this.metafieldSetMutation, {
         session: this.session,
-        namespace: 'fingrid',
-        key: 'saved_banks',
-        value: JSON.stringify(updatedBanks),
-        type: 'json',
-        owner_id: customerId,
-        owner_resource: 'customer'
+        variables: {
+          metafields: [{
+            namespace: 'fingrid',
+            key: 'saved_banks',
+            value: JSON.stringify(updatedBanks),
+            type: 'json',
+            ownerId: gid
+          }]
+        }
       });
 
-      await metafield.save();
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to remove metafield');
+      }
     } catch (error) {
       console.error('Error removing bank account:', error);
       throw new Error('Failed to remove bank account');
@@ -91,17 +203,26 @@ export class ShopifyStorageService {
   // Transaction Management
   async linkTransactionToOrder(orderId: string, transactionData: TransactionData): Promise<void> {
     try {
-      const metafield = new shopify.rest.Metafield({
+      const gid = `gid://shopify/Order/${orderId}`;
+      const response = await shopify.graphql(this.metafieldSetMutation, {
         session: this.session,
-        namespace: 'fingrid',
-        key: 'transaction_data',
-        value: JSON.stringify(transactionData),
-        type: 'json',
-        owner_id: orderId,
-        owner_resource: 'order'
+        variables: {
+          metafields: [{
+            namespace: 'fingrid',
+            key: 'transaction_data',
+            value: JSON.stringify(transactionData),
+            type: 'json',
+            ownerId: gid
+          }]
+        }
       });
 
-      await metafield.save();
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to link transaction to order');
+      }
     } catch (error) {
       console.error('Error linking transaction to order:', error);
       throw new Error('Failed to link transaction to order');
@@ -110,17 +231,22 @@ export class ShopifyStorageService {
 
   async getTransactionByOrderId(orderId: string): Promise<TransactionData | null> {
     try {
-      const response = await shopify.rest.Metafield.all({
+      const gid = `gid://shopify/Order/${orderId}`;
+      const response = await shopify.graphql(this.metafieldQuery, {
         session: this.session,
-        owner_id: orderId,
-        owner_resource: 'order',
-        namespace: 'fingrid',
-        key: 'transaction_data'
+        variables: { owner: gid }
       });
 
-      if (response.data && response.data.length > 0) {
-        const metafield = response.data[0];
-        return JSON.parse(metafield.value as string);
+      const data = await response.json();
+      
+      if (data.data?.node?.metafields?.edges) {
+        const metafield = data.data.node.metafields.edges.find(
+          (edge: any) => edge.node.namespace === 'fingrid' && edge.node.key === 'transaction_data'
+        );
+        
+        if (metafield) {
+          return JSON.parse(metafield.node.value);
+        }
       }
 
       return null;
@@ -133,17 +259,21 @@ export class ShopifyStorageService {
   // App Settings Management
   async getAppSettings(): Promise<AppSettings> {
     try {
-      const response = await shopify.rest.Metafield.all({
+      const response = await shopify.graphql(this.shopMetafieldsQuery, {
         session: this.session,
-        owner_resource: 'shop',
-        namespace: 'fingrid_app',
-        key: 'settings'
       });
 
-      if (response.data && response.data.length > 0) {
-        const metafield = response.data[0];
-        const settings = JSON.parse(metafield.value as string);
-        return this.decryptSensitiveFields(settings);
+      const data = await response.json();
+      
+      if (data.data?.shop?.metafields?.edges) {
+        const metafield = data.data.shop.metafields.edges.find(
+          (edge: any) => edge.node.key === 'settings'
+        );
+        
+        if (metafield) {
+          const settings = JSON.parse(metafield.node.value);
+          return this.decryptSensitiveFields(settings);
+        }
       }
 
       return this.getDefaultSettings();
@@ -157,16 +287,39 @@ export class ShopifyStorageService {
     try {
       const encryptedSettings = this.encryptSensitiveFields(settings);
 
-      const metafield = new shopify.rest.Metafield({
+      // Get shop GID first
+      const shopResponse = await shopify.graphql(`#graphql
+        query getShop {
+          shop {
+            id
+          }
+        }
+      `, {
         session: this.session,
-        namespace: 'fingrid_app',
-        key: 'settings',
-        value: JSON.stringify(encryptedSettings),
-        type: 'json',
-        owner_resource: 'shop'
       });
 
-      await metafield.save();
+      const shopData = await shopResponse.json();
+      const shopGid = shopData.data.shop.id;
+
+      const response = await shopify.graphql(this.metafieldSetMutation, {
+        session: this.session,
+        variables: {
+          metafields: [{
+            namespace: 'fingrid_app',
+            key: 'settings',
+            value: JSON.stringify(encryptedSettings),
+            type: 'json',
+            ownerId: shopGid
+          }]
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to update app settings');
+      }
     } catch (error) {
       console.error('Error updating app settings:', error);
       throw new Error('Failed to update app settings');
@@ -186,16 +339,39 @@ export class ShopifyStorageService {
       // Keep only last 1000 webhook events to prevent metafield bloat
       const trimmedEvents = updatedEvents.slice(-1000);
 
-      const metafield = new shopify.rest.Metafield({
+      // Get shop GID first
+      const shopResponse = await shopify.graphql(`#graphql
+        query getShop {
+          shop {
+            id
+          }
+        }
+      `, {
         session: this.session,
-        namespace: 'fingrid_app',
-        key: 'webhook_events',
-        value: JSON.stringify(trimmedEvents),
-        type: 'json',
-        owner_resource: 'shop'
       });
 
-      await metafield.save();
+      const shopData = await shopResponse.json();
+      const shopGid = shopData.data.shop.id;
+
+      const response = await shopify.graphql(this.metafieldSetMutation, {
+        session: this.session,
+        variables: {
+          metafields: [{
+            namespace: 'fingrid_app',
+            key: 'webhook_events',
+            value: JSON.stringify(trimmedEvents),
+            type: 'json',
+            ownerId: shopGid
+          }]
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to log webhook event');
+      }
     } catch (error) {
       console.error('Error logging webhook event:', error);
       throw new Error('Failed to log webhook event');
@@ -204,16 +380,20 @@ export class ShopifyStorageService {
 
   private async getWebhookEvents(): Promise<WebhookEventData[]> {
     try {
-      const response = await shopify.rest.Metafield.all({
+      const response = await shopify.graphql(this.shopMetafieldsQuery, {
         session: this.session,
-        owner_resource: 'shop',
-        namespace: 'fingrid_app',
-        key: 'webhook_events'
       });
 
-      if (response.data && response.data.length > 0) {
-        const metafield = response.data[0];
-        return JSON.parse(metafield.value as string);
+      const data = await response.json();
+      
+      if (data.data?.shop?.metafields?.edges) {
+        const metafield = data.data.shop.metafields.edges.find(
+          (edge: any) => edge.node.key === 'webhook_events'
+        );
+        
+        if (metafield) {
+          return JSON.parse(metafield.node.value);
+        }
       }
 
       return [];
