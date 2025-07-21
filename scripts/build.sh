@@ -1,22 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "🔧 Setting up Prisma for production..."
+echo "🏗️ Building Remix app with memory session storage..."
 
-# Generate Prisma client
+# Generate Prisma client (still needed for metafields storage service)
 echo "📦 Generating Prisma client..."
 npx prisma generate
 
-# Create database directory if it doesn't exist
-mkdir -p /tmp
-
-# Set database URL to a writable location on Vercel
-export DATABASE_URL="file:/tmp/prod.db"
-
-# Deploy migrations (create tables)
-echo "🗃️ Running database migrations..."
-npx prisma migrate deploy
-
+# Build the Remix app
 echo "🏗️ Building Remix app..."
 npx remix vite:build
 

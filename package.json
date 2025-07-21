@@ -37,6 +37,7 @@
     "@shopify/app-bridge-react": "^4.1.6",
     "@shopify/polaris": "^12.0.0",
     "@shopify/shopify-app-remix": "^3.7.0",
+    "@shopify/shopify-app-session-storage-memory": "^4.0.18",
     "@shopify/shopify-app-session-storage-prisma": "^6.0.0",
     "@vercel/remix": "^2.16.7",
     "crypto-js": "^4.2.0",
