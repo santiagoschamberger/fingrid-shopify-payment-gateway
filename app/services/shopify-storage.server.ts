@@ -403,18 +403,35 @@ export class ShopifyStorageService {
 
   private decryptSensitiveFields(settings: AppSettings): AppSettings {
     try {
-      return {
-        ...settings,
-        testClientSecret: settings.testClientSecret ? decrypt(settings.testClientSecret) : undefined,
-        liveClientSecret: settings.liveClientSecret ? decrypt(settings.liveClientSecret) : undefined
-      };
+      const result = { ...settings };
+      
+      // Handle testClientSecret
+      if (settings.testClientSecret) {
+        try {
+          const decrypted = decrypt(settings.testClientSecret);
+          result.testClientSecret = decrypted || settings.testClientSecret; // Keep original if decryption fails
+        } catch (error) {
+          console.warn('Failed to decrypt testClientSecret, keeping original');
+          result.testClientSecret = settings.testClientSecret;
+        }
+      }
+      
+      // Handle liveClientSecret
+      if (settings.liveClientSecret) {
+        try {
+          const decrypted = decrypt(settings.liveClientSecret);
+          result.liveClientSecret = decrypted || settings.liveClientSecret; // Keep original if decryption fails
+        } catch (error) {
+          console.warn('Failed to decrypt liveClientSecret, keeping original');
+          result.liveClientSecret = settings.liveClientSecret;
+        }
+      }
+      
+      return result;
     } catch (error) {
       console.warn('Failed to decrypt some sensitive fields:', error);
-      return {
-        ...settings,
-        testClientSecret: undefined,
-        liveClientSecret: undefined
-      };
+      // Return settings as-is if there's a general error
+      return settings;
     }
   }
 
