@@ -2,7 +2,7 @@
   "name": "usapayments-bank",
   "private": true,
   "scripts": {
-    "build": "prisma generate && remix vite:build",
+    "build": "./scripts/build.sh",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",

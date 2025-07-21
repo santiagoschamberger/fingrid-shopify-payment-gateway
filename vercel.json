@@ -1,6 +1,9 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "build/client",
+  "env": {
+    "DATABASE_URL": "file:/tmp/prod.db"
+  },
   "rewrites": [
     {
       "source": "/(.*)",
