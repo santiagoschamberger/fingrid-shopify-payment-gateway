@@ -20,17 +20,47 @@ import { loginErrorMessage } from "./error.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  try {
+    console.log('Auth login loader: Starting...');
+    console.log('Environment check:', {
+      hasApiKey: !!process.env.SHOPIFY_API_KEY,
+      hasApiSecret: !!process.env.SHOPIFY_API_SECRET,
+      hasAppUrl: !!process.env.SHOPIFY_APP_URL,
+      hasScopes: !!process.env.SCOPES,
+    });
+    
+    const loginResult = await login(request);
+    console.log('Auth login loader: Login result type:', typeof loginResult);
+    const errors = loginErrorMessage(loginResult);
+    console.log('Auth login loader: Processed errors:', errors);
 
-  return { errors, polarisTranslations };
+    return { errors, polarisTranslations };
+  } catch (error) {
+    console.error('Auth login loader error:', error);
+    return { 
+      errors: { shop: 'Authentication system error. Please try again.' }, 
+      polarisTranslations 
+    };
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  try {
+    console.log('Auth login action: Starting...');
+    const loginResult = await login(request);
+    console.log('Auth login action: Login result:', loginResult);
+    const errors = loginErrorMessage(loginResult);
+    console.log('Auth login action: Processed errors:', errors);
 
-  return {
-    errors,
-  };
+    return {
+      errors,
+    };
+  } catch (error) {
+    console.error('Auth login action error:', error);
+    return {
+      errors: { shop: 'Authentication failed. Please try again.' },
+    };
+  }
 };
 
 export default function Auth() {
