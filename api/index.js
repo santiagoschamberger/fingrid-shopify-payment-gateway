@@ -1,14 +1,18 @@
 import { createRequestHandler } from "@vercel/remix";
 import * as build from "../build/server/index.js";
 
-console.log("Build object keys:", Object.keys(build));
-console.log("Routes type:", typeof build.routes);
-console.log("Routes exists:", !!build.routes);
-
-if (build.routes) {
-  console.log("Routes keys:", Object.keys(build.routes));
-} else {
-  console.log("Routes is:", build.routes);
-}
+console.log("Checking each route for issues:");
+Object.entries(build.routes).forEach(([key, route]) => {
+  console.log(`Route ${key}:`, {
+    id: route?.id,
+    parentId: route?.parentId,
+    path: route?.path,
+    index: route?.index,
+    module: !!route?.module
+  });
+  if (!route || typeof route !== 'object') {
+    console.log(`ERROR: Route ${key} is invalid:`, route);
+  }
+});
 
 export default createRequestHandler({ build });
