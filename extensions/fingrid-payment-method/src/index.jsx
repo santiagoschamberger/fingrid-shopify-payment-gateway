@@ -54,20 +54,27 @@ function FingridPaymentMethod() {
 
   const loadFingridSDK = async () => {
     try {
-      // Load Fingrid's JavaScript SDK dynamically
+      // Use correct Fingrid JavaScript SDK URLs from documentation
       const script = document.createElement('script');
       script.src = settings.testMode 
-        ? 'https://js.test.fingrid.com/cabbage.js'
-        : 'https://js.fingrid.com/cabbage.js';
-      script.onload = () => setFingridLoaded(true);
+        ? 'https://cabbagepay.com/js/sandbox/cabbage.js'
+        : 'https://cabbagepay.com/js/production/cabbage.js';
+      
+      script.onload = () => {
+        setFingridLoaded(true);
+        // Set up message listener for Fingrid responses
+        window.addEventListener('message', handleFingridMessage);
+      };
+      
       script.onerror = () => {
-        setErrorMessage('Failed to load payment interface');
+        setErrorMessage('Failed to load payment interface. Please try again.');
         setPaymentStatus('error');
       };
+      
       document.head.appendChild(script);
     } catch (error) {
       console.error('Failed to load Fingrid SDK:', error);
-      setErrorMessage('Payment service unavailable');
+      setErrorMessage('Payment service temporarily unavailable');
       setPaymentStatus('error');
     }
   };
@@ -88,12 +95,12 @@ function FingridPaymentMethod() {
         return result;
       } catch (error) {
         setPaymentStatus('error');
-        setErrorMessage(error.message || 'Payment processing failed');
+        setErrorMessage(error.message || 'Payment processing failed. Please try again.');
         
         return {
           ...result,
           behavior: 'block',
-          reason: 'Payment processing failed. Please try again.',
+          reason: 'Payment processing failed. Please try again or choose a different payment method.',
         };
       } finally {
         setIsProcessing(false);
@@ -101,40 +108,61 @@ function FingridPaymentMethod() {
     });
   }, [isSelected, fingridLoaded]);
 
+  const handleFingridMessage = (event) => {
+    try {
+      // Handle both string and object data
+      let data;
+      if (typeof event.data === 'string') {
+        data = JSON.parse(event.data);
+      } else {
+        data = event.data;
+      }
+      
+      if (data.message === 'success') {
+        // User successfully connected bank, now exchange the public token
+        exchangePublicToken(data.public_token)
+          .then(() => {
+            setPaymentStatus('success');
+            if (window.cabbage && window.cabbage.closeGrid) {
+              window.cabbage.closeGrid();
+            }
+          })
+          .catch((error) => {
+            setPaymentStatus('error');
+            setErrorMessage(error.message || 'Payment processing failed');
+            setIsProcessing(false);
+          });
+      } else if (data.message === 'terminated') {
+        // User cancelled the flow
+        setPaymentStatus('error');
+        setErrorMessage('Payment cancelled. Please try again or choose a different payment method.');
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error('Error parsing Fingrid message:', error);
+      setPaymentStatus('error');
+      setErrorMessage('Payment interface error. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
   const processPayment = async () => {
     return new Promise((resolve, reject) => {
       try {
         // Generate link token first
         generateLinkTokenForPayment()
           .then((token) => {
-            if (!window.Fingrid) {
-              throw new Error('Fingrid SDK not loaded');
+            if (!window.cabbage) {
+              throw new Error('Payment interface not ready. Please refresh and try again.');
             }
 
-            // Initialize Fingrid with the link token
-            window.Fingrid.create({
-              link_token: token,
-              onSuccess: (public_token, metadata) => {
-                // Exchange public token for bank account access
-                exchangePublicToken(public_token, metadata)
-                  .then(() => {
-                    setPaymentStatus('success');
-                    resolve();
-                  })
-                  .catch(reject);
-              },
-              onLoad: () => {
-                console.log('Fingrid interface loaded');
-              },
-              onExit: (err, metadata) => {
-                if (err) {
-                  console.error('Fingrid flow exited with error:', err);
-                  reject(new Error(err.display_message || 'Payment cancelled'));
-                } else {
-                  reject(new Error('Payment cancelled by user'));
-                }
-              },
-            }).open();
+            // Store resolve/reject for use in message handler
+            window.fingridResolve = resolve;
+            window.fingridReject = reject;
+
+            // Initialize and open Fingrid interface according to documentation
+            window.cabbage.initializeGrid(token);
+            window.cabbage.openGrid(token);
           })
           .catch(reject);
       } catch (error) {
@@ -147,6 +175,9 @@ function FingridPaymentMethod() {
     const linkData = {
       customer_id: customer?.id,
       customer_email: customer?.email,
+      customer_phone: customer?.phone,
+      customer_first_name: customer?.firstName,
+      customer_last_name: customer?.lastName,
       return_url: window.location.href,
       amount: finalAmount,
       currency: 'USD',
@@ -162,43 +193,88 @@ function FingridPaymentMethod() {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to generate payment token');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to initialize payment. Please try again.');
     }
 
-    const { link_token } = await response.json();
-    return link_token;
+    const data = await response.json();
+    if (!data.success || !data.link_token) {
+      throw new Error(data.error || 'Failed to initialize payment. Please try again.');
+    }
+
+    return data.link_token;
   };
 
-  const exchangePublicToken = async (public_token, metadata) => {
-    const exchangeData = {
-      public_token,
-      account_id: metadata.account_id,
-      customer_id: customer?.id,
-      amount: finalAmount,
-      currency: 'USD',
-      line_items: cartLines.map(line => ({
-        id: line.id,
-        title: line.merchandise.title,
-        quantity: line.quantity,
-        price: line.merchandise.price.amount,
-      })),
-    };
+  const exchangePublicToken = async (public_token) => {
+    try {
+      // First exchange public token for bank token
+      const exchangeData = {
+        public_token,
+        customer_id: customer?.id,
+      };
 
-    const response = await fetch('/api/fingrid/exchange-token', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${sessionToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(exchangeData),
-    });
+      const exchangeResponse = await fetch('/api/fingrid/exchange-token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(exchangeData),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Payment processing failed');
+      if (!exchangeResponse.ok) {
+        const error = await exchangeResponse.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to connect bank account. Please try again.');
+      }
+
+      const exchangeResult = await exchangeResponse.json();
+      if (!exchangeResult.success || !exchangeResult.bank_token) {
+        throw new Error(exchangeResult.error || 'Failed to connect bank account. Please try again.');
+      }
+
+      // Now create the transaction using the bank token
+      const transactionData = {
+        bank_token: exchangeResult.bank_token,
+        amount: finalAmount,
+        currency: 'USD',
+        customer_id: customer?.id,
+        statement_descriptor: `Shopify Order`,
+        metadata: JSON.stringify({
+          shopify_checkout: true,
+          customer_email: customer?.email,
+          line_items: cartLines.map(line => ({
+            id: line.id,
+            title: line.merchandise.title,
+            quantity: line.quantity,
+            price: line.merchandise.price.amount,
+          })),
+        }),
+      };
+
+      const transactionResponse = await fetch('/api/fingrid/process-payment', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionData),
+      });
+
+      if (!transactionResponse.ok) {
+        const error = await transactionResponse.json().catch(() => ({}));
+        throw new Error(error.error || 'Payment processing failed. Please try again.');
+      }
+
+      const transactionResult = await transactionResponse.json();
+      if (!transactionResult.success) {
+        throw new Error(transactionResult.error || 'Payment processing failed. Please try again.');
+      }
+
+      return transactionResult;
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      throw error;
     }
-
-    return response.json();
   };
 
   const handleTogglePayment = (checked) => {
@@ -228,7 +304,7 @@ function FingridPaymentMethod() {
       {isSelected && (
         <BlockStack spacing="base">
           <Text size="small" appearance="subdued">
-            🏦 Secure bank transfer powered by Fingrid. Select your bank and pay directly from your account.
+            🏦 Secure bank transfer powered by FinGrid. Connect your bank account and pay directly.
           </Text>
 
           {discountPercentage > 0 && (
@@ -239,7 +315,7 @@ function FingridPaymentMethod() {
             </Banner>
           )}
 
-          {!fingridLoaded && (
+          {!fingridLoaded && paymentStatus === 'idle' && (
             <BlockStack spacing="tight">
               <SkeletonText inlineSize="large" />
               <Text size="small" appearance="subdued">
@@ -249,16 +325,18 @@ function FingridPaymentMethod() {
           )}
 
           {fingridLoaded && paymentStatus === 'idle' && (
-            <Text size="small" appearance="accent" emphasis="bold">
-              ✓ Payment interface ready. Click "Complete order" to select your bank.
-            </Text>
+            <Banner status="info">
+              <Text size="small">
+                ✓ Payment interface ready. Click "Complete order" to select your bank and authorize payment.
+              </Text>
+            </Banner>
           )}
 
           {paymentStatus === 'processing' && (
             <BlockStack spacing="tight">
               <SkeletonText inlineSize="large" />
               <Text size="small" appearance="subdued">
-                🏦 Opening Fingrid bank selection...
+                🏦 Opening bank selection interface...
               </Text>
             </BlockStack>
           )}
@@ -274,7 +352,7 @@ function FingridPaymentMethod() {
           {paymentStatus === 'success' && (
             <Banner status="success">
               <Text size="small">
-                ✅ Payment processed successfully! Your bank transfer is complete.
+                ✅ Payment authorized successfully! Your bank transfer is being processed.
               </Text>
             </Banner>
           )}
@@ -295,7 +373,7 @@ function FingridPaymentMethod() {
           </InlineStack>
 
           <Text size="small" appearance="subdued">
-            When you complete your order, Fingrid's secure popup will open for bank selection and payment authorization.
+            When you complete your order, FinGrid's secure popup will open for bank selection and payment authorization. The process is secure and your bank credentials are never shared.
           </Text>
         </BlockStack>
       )}

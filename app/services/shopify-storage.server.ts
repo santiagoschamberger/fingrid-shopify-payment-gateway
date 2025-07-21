@@ -195,6 +195,40 @@ export class ShopifyStorageService {
     }
   }
 
+  async updateBankAccountStatus(customerId: string, bankToken: string, isActive: boolean): Promise<void> {
+    try {
+      const existingBanks = await this.getSavedBanks(customerId);
+      const updatedBanks = existingBanks.map(bank => 
+        bank.token === bankToken 
+          ? { ...bank, isActive }
+          : bank
+      );
+
+      const gid = `gid://shopify/Customer/${customerId}`;
+      const response = await this.admin.graphql(this.metafieldSetMutation, {
+        variables: {
+          metafields: [{
+            namespace: 'fingrid',
+            key: 'saved_banks',
+            value: JSON.stringify(updatedBanks),
+            type: 'json',
+            ownerId: gid
+          }]
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('GraphQL errors:', data.data.metafieldsSet.userErrors);
+        throw new Error('Failed to update bank account status');
+      }
+    } catch (error) {
+      console.error('Error updating bank account status:', error);
+      throw new Error('Failed to update bank account status');
+    }
+  }
+
   // Transaction Management
   async linkTransactionToOrder(orderId: string, transactionData: TransactionData): Promise<void> {
     try {

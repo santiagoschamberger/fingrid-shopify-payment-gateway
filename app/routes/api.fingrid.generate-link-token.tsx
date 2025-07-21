@@ -3,42 +3,84 @@ import type { ActionFunctionArgs } from '@remix-run/node';
 import { authenticate } from '~/shopify.server';
 import { FingridApiService } from '~/services/fingrid-api.server';
 import { ShopifyStorageService } from '~/services/shopify-storage.server';
-import { validateInput, schemas } from '~/utils/validation.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
-    const { session, admin } = await authenticate.public.appProxy(request);
+    const { session, admin } = await authenticate.admin(request);
     
-    if (!session) {
-      return json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const formData = await request.formData();
-    const data = {
-      email: formData.get('email') as string,
-      firstName: formData.get('firstName') as string,
-      lastName: formData.get('lastName') as string,
-      shopDomain: session.shop
-    };
-
-    // Validate input
-    const validatedData = validateInput(schemas.linkTokenRequest, data);
+    const requestData = await request.json();
+    const { 
+      customer_id, 
+      customer_email, 
+      customer_phone,
+      customer_first_name,
+      customer_last_name,
+      return_url, 
+      amount, 
+      currency 
+    } = requestData;
 
     // Get app settings
     const storageService = new ShopifyStorageService(session, admin);
     const settings = await storageService.getAppSettings();
 
-    // Generate link token
+    // Validate required settings
+    if (!settings.testClientId && !settings.liveClientId) {
+      return json({ 
+        success: false, 
+        error: 'FinGrid credentials not configured. Please configure the app settings.' 
+      }, { status: 400 });
+    }
+
+    // Generate link token with proper Fingrid API parameters
     const fingridApi = new FingridApiService(settings);
     const result = await fingridApi.generateLinkToken({
-      email: validatedData.email,
-      firstName: validatedData.firstName,
-      lastName: validatedData.lastName,
+      customer_email,
+      customer_id,
+      customer_phone,
+      customer_first_name,
+      customer_last_name,
+      return_url,
+      amount,
+      currency
     });
 
-    return json({ success: true, linkToken: result.linkToken });
+    return json({ 
+      success: true, 
+      link_token: result.link_token,
+      expiry: result.expiry 
+    });
   } catch (error) {
     console.error('Error generating link token:', error);
+    
+    // Handle specific FinGrid API errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      let userMessage = 'Failed to initialize payment.';
+      
+      switch ((error as any).code) {
+        case '9450':
+          userMessage = 'Invalid theme color configuration.';
+          break;
+        case '5463':
+          userMessage = 'Customer email or phone number is required.';
+          break;
+        case '3957':
+          userMessage = 'Store name is required for payment initialization.';
+          break;
+        case '9384':
+          userMessage = 'Invalid credentials. Please check app configuration.';
+          break;
+        case '0113':
+          userMessage = 'Payment service error. Please try again or contact support.';
+          break;
+      }
+      
+      return json({ 
+        success: false, 
+        error: userMessage 
+      }, { status: 400 });
+    }
+    
     return json({ 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to generate link token' 
