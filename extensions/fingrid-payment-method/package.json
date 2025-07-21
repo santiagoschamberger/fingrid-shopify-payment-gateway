@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "build": "mkdir -p dist && cp src/index.jsx dist/"
+    "build": "mkdir -p dist && cp src/index.jsx dist/index.js"
   },
   "dependencies": {
     "@shopify/ui-extensions": "^2025.01",
