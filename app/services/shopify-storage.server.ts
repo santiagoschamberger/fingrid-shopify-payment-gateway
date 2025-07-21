@@ -387,11 +387,18 @@ export class ShopifyStorageService {
   }
 
   private encryptSensitiveFields(settings: AppSettings): AppSettings {
-    return {
-      ...settings,
-      testClientSecret: settings.testClientSecret ? encrypt(settings.testClientSecret) : undefined,
-      liveClientSecret: settings.liveClientSecret ? encrypt(settings.liveClientSecret) : undefined
-    };
+    try {
+      return {
+        ...settings,
+        testClientSecret: settings.testClientSecret ? encrypt(settings.testClientSecret) : undefined,
+        liveClientSecret: settings.liveClientSecret ? encrypt(settings.liveClientSecret) : undefined
+      };
+    } catch (error) {
+      console.error('Error encrypting sensitive fields:', error);
+      // If encryption fails, store without encryption but log the issue
+      console.warn('Storing sensitive fields without encryption due to encryption failure');
+      return settings;
+    }
   }
 
   private decryptSensitiveFields(settings: AppSettings): AppSettings {

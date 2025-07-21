@@ -6,33 +6,44 @@ const APP_IDENTIFIER = 'fingrid-payment-app';
 
 export function encrypt(text: string): string {
   try {
+    if (!text || text.trim() === '') {
+      return text; // Return empty strings as-is
+    }
+    
     const encrypted = CryptoJS.AES.encrypt(text, ENCRYPTION_KEY, {
-      mode: CryptoJS.mode.GCM,
+      mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7
     });
     
     return encrypted.toString();
   } catch (error) {
+    console.error('Encryption error:', error);
     throw new Error('Failed to encrypt data');
   }
 }
 
 export function decrypt(encryptedData: string): string {
   try {
+    if (!encryptedData || encryptedData.trim() === '') {
+      return encryptedData; // Return empty strings as-is
+    }
+    
     const decrypted = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY, {
-      mode: CryptoJS.mode.GCM,
+      mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7
     });
     
     const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
     
-    if (!decryptedText) {
-      throw new Error('Failed to decrypt data - invalid key or corrupted data');
+    if (!decryptedText && encryptedData.trim() !== '') {
+      console.warn('Failed to decrypt data - invalid key or corrupted data');
+      return ''; // Return empty string instead of throwing
     }
     
     return decryptedText;
   } catch (error) {
-    throw new Error('Failed to decrypt data');
+    console.error('Decryption error:', error);
+    return ''; // Return empty string instead of throwing
   }
 }
 
