@@ -10,9 +10,28 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  try {
+    console.log('App loader: Starting authentication...');
+    console.log('App loader: Environment check:', {
+      hasApiKey: !!process.env.SHOPIFY_API_KEY,
+      hasApiSecret: !!process.env.SHOPIFY_API_SECRET,
+      hasAppUrl: !!process.env.SHOPIFY_APP_URL,
+      hasSessionSecret: !!process.env.SESSION_SECRET,
+      nodeEnv: process.env.NODE_ENV,
+    });
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+    await authenticate.admin(request);
+    console.log('App loader: Authentication successful');
+
+    return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  } catch (error) {
+    console.error('App loader error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    throw new Response('Authentication failed', { 
+      status: 500,
+      statusText: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 };
 
 export default function App() {
