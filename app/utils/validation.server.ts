@@ -30,9 +30,9 @@ export const schemas = {
     liveClientId: z.string().optional(),
     liveClientSecret: z.string().optional(),
     liveConnectedAccount: z.string().optional(),
-    postTransactionStatus: z.string(),
-    webhookSuccessStatus: z.string(),
-    webhookFailedStatus: z.string()
+    postTransactionStatus: z.string().nullable().transform(val => val || ""),
+    webhookSuccessStatus: z.string().nullable().transform(val => val || ""),
+    webhookFailedStatus: z.string().nullable().transform(val => val || "")
   }),
 
   bankAccountData: z.object({
