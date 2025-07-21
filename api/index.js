@@ -10,10 +10,37 @@ export default async function(req, res) {
   try {
     // Convert Node.js request to Web API Request
     const url = `https://${req.headers.host}${req.url}`;
+    
+    // Handle request body properly for different content types
+    let body = undefined;
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body !== undefined) {
+      const contentType = req.headers['content-type'] || '';
+      
+      if (contentType.includes('application/x-www-form-urlencoded') && typeof req.body === 'object') {
+        // Convert parsed form data back to URL-encoded string
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(req.body)) {
+          if (Array.isArray(value)) {
+            value.forEach(v => params.append(key, String(v)));
+          } else if (value !== null && value !== undefined) {
+            params.append(key, String(value));
+          }
+        }
+        body = params.toString();
+      } else if (typeof req.body === 'string') {
+        body = req.body;
+      } else if (Buffer.isBuffer(req.body)) {
+        body = req.body;
+      } else {
+        // Fallback: stringify the object
+        body = JSON.stringify(req.body);
+      }
+    }
+    
     const request = new Request(url, {
       method: req.method,
       headers: new Headers(req.headers),
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      body: body,
     });
 
     // Get Remix response
