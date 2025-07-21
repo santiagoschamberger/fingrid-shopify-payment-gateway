@@ -46,24 +46,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   
   try {
     const formData = await request.formData();
+    
+    // Helper function to get form value or default
+    const getFormValue = (name: string, defaultValue: string = '') => {
+      const value = formData.get(name);
+      return value === null ? defaultValue : String(value);
+    };
+    
     const settings = {
       testMode: formData.get('testMode') === 'true',
-      clientName: formData.get('clientName') as string,
-      discountPercentage: parseFloat(formData.get('discountPercentage') as string) || 0,
-      themeColor: formData.get('themeColor') as string,
-      themeLogo: formData.get('themeLogo') as string,
-      testGatewayUrl: formData.get('testGatewayUrl') as string,
-      testClientId: formData.get('testClientId') as string,
-      testClientSecret: formData.get('testClientSecret') as string,
-      testConnectedAccount: formData.get('testConnectedAccount') as string,
-      liveGatewayUrl: formData.get('liveGatewayUrl') as string,
-      liveClientId: formData.get('liveClientId') as string,
-      liveClientSecret: formData.get('liveClientSecret') as string,
-      liveConnectedAccount: formData.get('liveConnectedAccount') as string,
-      postTransactionStatus: formData.get('postTransactionStatus') as string || 'pending',
-      webhookSuccessStatus: formData.get('webhookSuccessStatus') as string || 'paid',
-      webhookFailedStatus: formData.get('webhookFailedStatus') as string || 'cancelled',
+      clientName: getFormValue('clientName'),
+      discountPercentage: parseFloat(getFormValue('discountPercentage', '0')) || 0,
+      themeColor: getFormValue('themeColor'),
+      themeLogo: getFormValue('themeLogo'),
+      testGatewayUrl: getFormValue('testGatewayUrl'),
+      testClientId: getFormValue('testClientId'),
+      testClientSecret: getFormValue('testClientSecret'),
+      testConnectedAccount: getFormValue('testConnectedAccount'),
+      liveGatewayUrl: getFormValue('liveGatewayUrl'),
+      liveClientId: getFormValue('liveClientId'),
+      liveClientSecret: getFormValue('liveClientSecret'),
+      liveConnectedAccount: getFormValue('liveConnectedAccount'),
+      postTransactionStatus: getFormValue('postTransactionStatus', 'pending'),
+      webhookSuccessStatus: getFormValue('webhookSuccessStatus', 'paid'),
+      webhookFailedStatus: getFormValue('webhookFailedStatus', 'cancelled'),
     };
+
+    console.log('Form data received:', Object.fromEntries(formData.entries()));
+    console.log('Processed settings:', settings);
 
     // Validate settings
     const validatedSettings = validateInput(schemas.settingsUpdate, settings);
@@ -94,10 +104,23 @@ export default function Settings() {
     
     const formDataToSubmit = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formDataToSubmit.append(key, value.toString());
-      }
+      // Always include the value, even if empty string
+      const valueToSubmit = value !== undefined && value !== null ? value.toString() : '';
+      formDataToSubmit.append(key, valueToSubmit);
     });
+    
+    // Ensure required fields are always present with defaults
+    if (!formDataToSubmit.has('postTransactionStatus') || !formDataToSubmit.get('postTransactionStatus')) {
+      formDataToSubmit.set('postTransactionStatus', 'pending');
+    }
+    if (!formDataToSubmit.has('webhookSuccessStatus') || !formDataToSubmit.get('webhookSuccessStatus')) {
+      formDataToSubmit.set('webhookSuccessStatus', 'paid');
+    }
+    if (!formDataToSubmit.has('webhookFailedStatus') || !formDataToSubmit.get('webhookFailedStatus')) {
+      formDataToSubmit.set('webhookFailedStatus', 'cancelled');
+    }
+    
+    console.log('Form data being submitted:', Object.fromEntries(formDataToSubmit.entries()));
     
     submit(formDataToSubmit, { 
       method: 'POST',
@@ -232,21 +255,21 @@ export default function Settings() {
                     <Select
                       label="Post-Transaction Status"
                       options={statusOptions}
-                      value={formData.postTransactionStatus}
+                      value={formData.postTransactionStatus || 'pending'}
                       onChange={(value) => setFormData({ ...formData, postTransactionStatus: value })}
                       helpText="Order status immediately after payment submission"
                     />
                     <Select
                       label="Webhook Success Status"
                       options={statusOptions}
-                      value={formData.webhookSuccessStatus}
+                      value={formData.webhookSuccessStatus || 'paid'}
                       onChange={(value) => setFormData({ ...formData, webhookSuccessStatus: value })}
                       helpText="Order status when payment succeeds"
                     />
                     <Select
                       label="Webhook Failed Status"
                       options={statusOptions}
-                      value={formData.webhookFailedStatus}
+                      value={formData.webhookFailedStatus || 'cancelled'}
                       onChange={(value) => setFormData({ ...formData, webhookFailedStatus: value })}
                       helpText="Order status when payment fails"
                     />
