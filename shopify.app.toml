@@ -29,13 +29,9 @@ api_version = "2025-07"
   topics = [ "orders/cancelled" ]
   uri = "/webhooks/orders/cancelled"
 
-  [[webhooks.subscriptions]]
-  topics = [ "customers/data_request" ]
-  uri = "/webhooks/customers/data_request"
-
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,write_orders,read_customers,write_customers,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,read_products,write_script_tags"
+scopes = "read_orders,write_orders,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,write_script_tags"
 
 [auth]
 redirect_urls = ["https://comm-participated-interface-criterion.trycloudflare.com/auth/callback", "https://comm-participated-interface-criterion.trycloudflare.com/auth/shopify/callback", "https://comm-participated-interface-criterion.trycloudflare.com/api/auth/callback"]

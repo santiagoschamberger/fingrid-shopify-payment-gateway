@@ -3,11 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "build": "mkdir -p dist && cp src/index.jsx dist/index.js"
+    "build": "shopify app build"
   },
   "dependencies": {
     "@shopify/ui-extensions": "^2025.01",
-    "@shopify/ui-extensions-react": "^2025.01"
+    "@shopify/ui-extensions-react": "^2025.01",
+    "react": "^18.2.0",
+    "react-reconciler": "^0.32.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.31"

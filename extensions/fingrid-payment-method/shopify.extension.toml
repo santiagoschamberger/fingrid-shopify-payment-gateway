@@ -2,7 +2,7 @@ name = "Fingrid Payment Method"
 type = "checkout_ui"
 
 [build]
-command = "npm run build"
+command = "shopify app build"
 path = "dist"
 
 [[targeting]]
@@ -23,3 +23,9 @@ target = "purchase.checkout.payment-method-list.render-after"
   key = "show_saved_banks"
   type = "boolean"
   name = "Show Saved Bank Accounts"
+
+  [[settings.fields]]
+  key = "test_mode"
+  type = "boolean"
+  name = "Test Mode"
+  description = "Enable test mode for sandbox environment"
