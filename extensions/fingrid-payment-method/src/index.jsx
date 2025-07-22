@@ -6,6 +6,7 @@ import {
   useApi,
   useCustomer,
   useTotalAmount,
+  useSelectedPaymentOptions,
   Text,
   BlockStack,
   InlineStack,
@@ -28,12 +29,24 @@ function FingridPaymentEnhancement() {
   const { sessionToken } = useApi();
   const customer = useCustomer();
   const totalAmount = useTotalAmount();
+  const selectedPaymentOptions = useSelectedPaymentOptions();
 
   const [isEnhancedMode, setIsEnhancedMode] = useState(false);
   const [linkToken, setLinkToken] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [paymentProcessed, setPaymentProcessed] = useState(false);
+
+  // Detect if Bank Transfer/Manual payment is selected
+  const isBankTransferSelected = selectedPaymentOptions.some(option => 
+    option.type === 'manualPayment' || 
+    option.type === 'offsite' ||
+    option.handle?.toLowerCase().includes('bank') ||
+    option.handle?.toLowerCase().includes('transfer') ||
+    option.handle?.toLowerCase().includes('manual') ||
+    option.name?.toLowerCase().includes('bank') ||
+    option.name?.toLowerCase().includes('transfer')
+  );
 
   // Show enhancement banner to encourage Bank Transfer selection
   const showEnhancement = () => {
@@ -184,6 +197,11 @@ function FingridPaymentEnhancement() {
       </Banner>
     );
   };
+
+  // Only show enhancement when Bank Transfer is selected
+  if (!isBankTransferSelected) {
+    return null; // Hide when other payment methods are selected
+  }
 
   // Return the appropriate interface
   if (isEnhancedMode) {
