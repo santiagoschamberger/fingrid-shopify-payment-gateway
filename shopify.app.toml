@@ -3,12 +3,12 @@
 client_id = "a5784bc519d756a0638a4a42ab287021"
 name = "usapayments-bank"
 handle = "usapayments-bank"
-application_url = "https://palestine-stationery-divx-restructuring.trycloudflare.com"
+application_url = "https://fingrid-shopify-payment-gateway.vercel.app"
 embedded = true
 
 [build]
 include_config_on_deploy = true
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2025-07"
@@ -34,7 +34,7 @@ api_version = "2025-07"
 scopes = "read_orders,write_orders,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,write_script_tags"
 
 [auth]
-redirect_urls = ["https://palestine-stationery-divx-restructuring.trycloudflare.com/auth/callback", "https://palestine-stationery-divx-restructuring.trycloudflare.com/auth/shopify/callback", "https://palestine-stationery-divx-restructuring.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://fingrid-shopify-payment-gateway.vercel.app/auth/callback", "https://fingrid-shopify-payment-gateway.vercel.app/auth/shopify/callback", "https://fingrid-shopify-payment-gateway.vercel.app/api/auth/callback"]
 
 [pos]
 embedded = false
