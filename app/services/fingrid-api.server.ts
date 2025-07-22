@@ -48,10 +48,20 @@ export class FingridApiService {
       payload.cust_last_name = customerData.customer_last_name;
     }
 
-    // Add theme customization if provided
+    // Add theme customization if provided - must be 6-digit hex
     if (this.settings.themeColor) {
-      // Remove # from hex color as per documentation
-      payload.theme_color = this.settings.themeColor.replace('#', '');
+      // Remove # from hex color and ensure it's 6 digits
+      let color = this.settings.themeColor.replace('#', '');
+      if (color.length === 3) {
+        // Convert 3-digit hex to 6-digit hex (e.g., "abc" -> "aabbcc")
+        color = color.split('').map(c => c + c).join('');
+      }
+      if (color.length === 6 && /^[0-9A-Fa-f]{6}$/.test(color)) {
+        payload.theme_color = color;
+      }
+    } else {
+      // Default theme color if none provided
+      payload.theme_color = '007acc';
     }
     if (this.settings.themeLogo) {
       payload.theme_logo = this.settings.themeLogo;
