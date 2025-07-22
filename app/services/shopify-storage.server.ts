@@ -480,10 +480,10 @@ export class ShopifyStorageService {
       themeColor: '#1a73e8',
       
       // Pre-populate with environment variables if available
-      testGatewayUrl: process.env.FINGRID_TEST_GATEWAY_URL || 'https://api.test.fingrid.com',
+      testGatewayUrl: process.env.FINGRID_TEST_GATEWAY_URL || 'https://sandbox.cabbagepay.com',
       testClientId: process.env.FINGRID_TEST_CLIENT_ID || 'AUrByDqHwcgK29YV7BkhrnzB2Jy8Vg',
       testClientSecret: process.env.FINGRID_TEST_CLIENT_SECRET || 'ViWpgUNQEJdCuRBXnXMe9V0MNzUcxb',
-      testScriptUrl: process.env.FINGRID_TEST_SCRIPT_URL || 'https://js.test.fingrid.com/cabbage.js',
+      testScriptUrl: process.env.FINGRID_TEST_SCRIPT_URL || 'https://cabbagepay.com/js/sandbox/cabbage.js',
       
       liveGatewayUrl: process.env.FINGRID_LIVE_GATEWAY_URL || 'https://api.fingrid.com',
       liveClientId: process.env.FINGRID_LIVE_CLIENT_ID || '',

@@ -197,7 +197,8 @@ export default function Settings() {
                         label="Test Gateway URL"
                         value={formData.testGatewayUrl || ''}
                         onChange={(value) => setFormData({ ...formData, testGatewayUrl: value })}
-                        placeholder="https://api.test.fingrid.com"
+                        placeholder="https://sandbox.cabbagepay.com"
+                        helpText="Fingrid test environment API base URL"
                       />
                       <TextField
                         label="Test Client ID"
