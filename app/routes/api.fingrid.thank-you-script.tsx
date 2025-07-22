@@ -18,6 +18,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   
   console.log('🔍 On thank you page, initializing Fingrid payment option');
   
+  // Load Fingrid SDK if not already loaded
+  function loadFingridSDK() {
+    return new Promise((resolve, reject) => {
+      if (window.Fingrid) {
+        resolve(window.Fingrid);
+        return;
+      }
+      
+      const script = document.createElement('script');
+      script.src = 'https://connect.fingrid.com/js/fingrid.js';
+      script.onload = () => {
+        console.log('🔍 Fingrid SDK loaded');
+        resolve(window.Fingrid);
+      };
+      script.onerror = () => {
+        console.error('🔍 Failed to load Fingrid SDK');
+        reject(new Error('Failed to load Fingrid SDK'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  
   // Extract order information from the page
   function getOrderInfo() {
     const orderNumber = document.querySelector('.os-order-number')?.textContent?.replace('#', '') || 
@@ -89,54 +111,89 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     
     // Add click handler for the payment button
     const payButton = banner.querySelector('#fingrid-pay-button');
-    payButton.addEventListener('click', function() {
+    payButton.addEventListener('click', async function() {
       console.log('🔍 Fingrid payment button clicked');
       
       // Show loading state
       payButton.textContent = '⏳ Generating payment link...';
       payButton.disabled = true;
       
-      // Make API call to generate payment link
-      fetch('/api/fingrid/generate-link-token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_number: orderInfo.orderNumber,
-          order_total: orderInfo.orderTotal,
-          source: 'thank_you_page'
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
+      try {
+        // Load Fingrid SDK first
+        await loadFingridSDK();
+        
+        // Make API call to generate payment link
+        const response = await fetch('/api/fingrid/generate-link-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            order_number: orderInfo.orderNumber,
+            order_total: orderInfo.orderTotal,
+            source: 'thank_you_page'
+          })
+        });
+        
+        const data = await response.json();
         console.log('🔍 Payment link response:', data);
         
         if (data.success && data.link_token) {
-          // Open Fingrid payment flow
-          const fingridUrl = \`https://connect.fingrid.com?token=\${data.link_token}\`;
-          window.open(fingridUrl, 'fingrid-payment', 'width=600,height=800');
+          // Use Fingrid popup instead of new window
+          console.log('🔍 Opening Fingrid popup with token:', data.link_token);
           
-          // Update button state
-          payButton.textContent = '✅ Payment Link Generated!';
-          payButton.style.background = '#4caf50';
+          const fingrid = window.Fingrid(data.link_token);
           
-          // Update banner
-          banner.style.background = '#e8f5e8';
-          banner.style.borderColor = '#4caf50';
+          // Open the Fingrid popup/modal
+          fingrid.open({
+            onSuccess: function(token, metadata) {
+              console.log('🔍 Fingrid payment successful:', { token, metadata });
+              
+              // Update button state
+              payButton.textContent = '✅ Payment Completed!';
+              payButton.style.background = '#4caf50';
+              
+              // Update banner
+              banner.style.background = '#e8f5e8';
+              banner.style.borderColor = '#4caf50';
+              
+              // Optional: Show success message
+              const successMsg = document.createElement('div');
+              successMsg.style.cssText = 'background: #4caf50; color: white; padding: 12px; border-radius: 4px; margin-top: 12px; text-align: center;';
+              successMsg.textContent = '🎉 Payment completed successfully! Your order will be processed shortly.';
+              banner.appendChild(successMsg);
+            },
+            onExit: function() {
+              console.log('🔍 Fingrid popup closed');
+              
+              // Reset button state
+              payButton.textContent = '🏦 Pay with Bank Transfer';
+              payButton.style.background = '#2196f3';
+              payButton.disabled = false;
+            },
+            onError: function(error) {
+              console.error('🔍 Fingrid payment error:', error);
+              
+              // Show error state
+              payButton.textContent = '❌ Payment Error - Try Again';
+              payButton.style.background = '#f44336';
+              payButton.disabled = false;
+            }
+          });
+          
         } else {
           console.error('🔍 Failed to generate payment link:', data.error);
           payButton.textContent = '❌ Error - Try Again';
           payButton.style.background = '#f44336';
           payButton.disabled = false;
         }
-      })
-      .catch(error => {
+        
+      } catch (error) {
         console.error('🔍 Network error:', error);
         payButton.textContent = '❌ Network Error - Try Again';
         payButton.style.background = '#f44336';
         payButton.disabled = false;
-      });
+      }
     });
     
     return banner;
