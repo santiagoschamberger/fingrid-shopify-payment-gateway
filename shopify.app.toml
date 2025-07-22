@@ -31,7 +31,7 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,write_orders,read_checkouts,write_checkouts,read_payment_gateways,write_payment_gateways,write_payment_sessions"
+scopes = "read_orders,write_orders,read_checkouts,write_checkouts,read_customers,write_customers"
 
 [auth]
 redirect_urls = ["https://fingrid-shopify-payment-gateway.vercel.app/auth/callback", "https://fingrid-shopify-payment-gateway.vercel.app/auth/shopify/callback", "https://fingrid-shopify-payment-gateway.vercel.app/api/auth/callback"]
