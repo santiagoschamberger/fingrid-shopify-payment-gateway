@@ -6,5 +6,5 @@ name = "fingrid-thankyou"
 handle = "fingrid-thankyou"
 
 [[extensions.targeting]]
-target = "purchase.thank-you.customer-information.render-after"
+target = "customer-account.order-status.customer-information.render-after"
 module = "./src/index.jsx"

@@ -8,15 +8,15 @@ import {
   Button,
   Banner,
   Spinner,
-} from '@shopify/ui-extensions-react/checkout';
+} from '@shopify/ui-extensions-react/customer-account';
 import { useState, useEffect } from 'react';
 
-// Thank You page extension - works on all Shopify plans including Grow
-export default reactExtension('purchase.thank-you.customer-information.render-after', () => (
-  <FingridThankYouPayment />
+// Customer Account Order Status extension - works on all Shopify plans
+export default reactExtension('customer-account.order-status.customer-information.render-after', () => (
+  <FingridOrderStatusPayment />
 ));
 
-function FingridThankYouPayment() {
+function FingridOrderStatusPayment() {
   const settings = useSettings();
   const { sessionToken } = useApi();
   
@@ -26,22 +26,23 @@ function FingridThankYouPayment() {
   const [paymentLinkGenerated, setPaymentLinkGenerated] = useState(false);
 
   // Debug logging
-  console.log('🔍 Fingrid Thank You Extension Loaded!');
+  console.log('🔍 Fingrid Order Status Extension Loaded!');
   console.log('🔍 Settings:', settings);
   console.log('🔍 SessionToken available:', !!sessionToken);
   console.log('🔍 Window location:', typeof window !== 'undefined' ? window.location.href : 'SSR');
 
-  // Get order ID from URL parameters
+  // Get order ID from URL parameters - customer account URLs are different
   const getOrderId = () => {
     if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const orderIdFromParams = urlParams.get('order_id');
-      const orderIdFromPath = window.location.pathname.split('/').pop();
+      // Customer account URLs: /account/orders/{order_id}
+      const pathParts = window.location.pathname.split('/');
+      const orderIndex = pathParts.findIndex(part => part === 'orders');
+      const orderId = orderIndex !== -1 ? pathParts[orderIndex + 1] : null;
       
-      console.log('🔍 Order ID from params:', orderIdFromParams);
-      console.log('🔍 Order ID from path:', orderIdFromPath);
+      console.log('🔍 Order ID from customer account URL:', orderId);
+      console.log('🔍 Full path parts:', pathParts);
       
-      return orderIdFromParams || orderIdFromPath;
+      return orderId;
     }
     return null;
   };
@@ -147,8 +148,7 @@ function FingridThankYouPayment() {
 
   console.log('🔍 Current state:', { loading, error, orderData: !!orderData, paymentLinkGenerated });
 
-  // DEBUGGING: Always show the banner for testing
-  // Remove this section after debugging is complete
+  // Show loading state
   if (loading) {
     return (
       <Banner status="info">
@@ -169,7 +169,7 @@ function FingridThankYouPayment() {
     );
   }
 
-  // DEBUGGING: Show banner even if not manual payment
+  // Show banner even if no order data for debugging
   if (!orderData) {
     return (
       <Banner status="info">
@@ -177,11 +177,6 @@ function FingridThankYouPayment() {
       </Banner>
     );
   }
-
-  // DEBUGGING: Always show for now (comment out the manual payment check)
-  // if (!isManualPayment()) {
-  //   return null;
-  // }
 
   // Show payment completion banner
   return (
