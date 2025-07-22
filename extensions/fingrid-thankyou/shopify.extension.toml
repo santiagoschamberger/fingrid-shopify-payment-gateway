@@ -1,0 +1,10 @@
+api_version = "2025-01"
+
+[[extensions]]
+type = "ui_extension"
+name = "fingrid-thankyou"
+handle = "fingrid-thankyou"
+
+[[extensions.targeting]]
+target = "purchase.thank-you.customer-information.render-after"
+module = "./src/index.jsx"
